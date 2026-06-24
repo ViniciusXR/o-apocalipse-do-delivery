@@ -1,0 +1,42 @@
+{
+  "name": "o-apocalipse-do-delivery",
+  "version": "1.0.0",
+  "description": "CheckoutService resiliente da EntregasJa - Engenharia do Caos e Testes de Desempenho (Fase 4 / SRE)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "start:app": "node src/server.js",
+    "start:gateway": "node infra/gateway-sim.js",
+    "start:cache": "node infra/cache-sim.js",
+    "stack": "concurrently -n gateway,cache,app -c blue,magenta,green \"npm:start:gateway\" \"npm:start:cache\" \"npm:start:app\"",
+    "stack:chaos": "concurrently -n gateway,cache,app -c blue,magenta,green \"npm:start:gateway\" \"npm:start:cache\" \"cross-env GATEWAY_URL=http://127.0.0.1:21001 CACHE_URL=http://127.0.0.1:21002 npm run start:app\"",
+    "chaos:setup": "node infra/toxiproxy/setup.js",
+    "chaos:gateway-latency": "node infra/toxiproxy/chaos-gateway-latency.js",
+    "chaos:herd": "node infra/toxiproxy/chaos-thundering-herd.js",
+    "chaos:reset": "node infra/toxiproxy/reset.js",
+    "monitor": "node scripts/record-metrics.js",
+    "burst": "node scripts/burst.js",
+    "k6:smoke": "k6 run load/smoke.js",
+    "k6:bf": "k6 run load/black-friday.js",
+    "k6:gateway-lento": "k6 run load/gateway-lento.js",
+    "k6:herd": "k6 run load/thundering-herd.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "sre",
+    "chaos-engineering",
+    "k6",
+    "toxiproxy",
+    "circuit-breaker",
+    "resilience"
+  ],
+  "author": "Grupo EntregasJa",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3"
+  }
+}

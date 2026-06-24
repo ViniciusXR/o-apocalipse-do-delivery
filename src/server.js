@@ -1,57 +1,28 @@
-const express = require('express');
-const { CheckoutService } = require('./services/CheckoutService');
+'use strict';
 
-const app = express();
-app.use(express.json());
+const { buildApp } = require('./app');
+const { config } = require('./config');
 
-// Mocks simulados de infraestrutura para o servidor rodar localmente antes do Toxiproxy
-const gatewayPagamentoMock = {
-  cobrar: async (valor) => {
-    // Simula o tempo de resposta padrão de uma API de terceiros (I/O Bound)
-    return new Promise(resolve => setTimeout(() => resolve({ status: 'APROVADO' }), 300));
-  }
-};
+const { app } = buildApp();
 
-const pedidoRepositoryMock = {
-  salvar: async (pedido) => {
-    // Simula a escrita no banco de dados
-    return { ...pedido, id: Math.floor(Math.random() * 10000) };
-  }
-};
-
-const emailServiceMock = {
-  enviarConfirmacao: async (email, msg) => console.log(`E-mail enviado para ${email}`)
-};
-
-// Instanciação do serviço legado
-const checkoutService = new CheckoutService(gatewayPagamentoMock, pedidoRepositoryMock, emailServiceMock);
-
-// ENDPOINT CRÍTICO: Rota que receberá a carga massiva da Black Friday
-app.post('/api/v1/checkout', async (req, res) => {
-  const { clienteEmail, valor, cartao } = req.body;
-  
-  if (!clienteEmail || !valor || !cartao) {
-    return res.status(400).json({ erro: 'Dados incompletos para checkout' });
-  }
-
-  const pedido = { clienteEmail, valor, cartao, status: 'PENDENTE' };
-  
-  // Executa o checkout
-  const resultado = await checkoutService.processar(pedido);
-
-  if (resultado && resultado.status === 'PROCESSADO') {
-    return res.status(200).json({ mensagem: 'Pedido finalizado com sucesso!', pedido: resultado });
-  }
-  
-  return res.status(500).json({ erro: 'Não foi possível processar seu pagamento. Tente mais tarde.' });
+const server = app.listen(config.port, () => {
+  console.log(`Servidor da EntregasJa rodando na porta ${config.port}`);
+  console.log(`  gateway -> ${config.gatewayUrl}`);
+  console.log(`  cache   -> ${config.cacheUrl}`);
+  console.log(`  timeout=${config.gatewayTimeoutMs}ms retry=${config.retry.maxAttempts} backoff=${config.retry.backoffMs}ms breaker@${config.breaker.errorThreshold * 100}%`);
 });
 
-// Endpoint auxiliar para simular o comportamento de Thundering Herd (Manada Estourada)
-// Útil para limpar o cache de sessões/cupons de desconto de forma abrupta sob carga
-app.post('/api/v1/cache/flush', (req, res) => {
-  console.log("💥 CACHE LIMPO ABRUPTAMENTE!");
-  res.json({ status: 'cache_invalidated' });
+// Degradacao graciosa tambem no processo: nao morrer por erros nao tratados.
+process.on('unhandledRejection', (reason) => {
+  console.error('[processo] unhandledRejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[processo] uncaughtException:', err);
 });
 
-const PORT = 3000;
-app.listen(PORT, () => console.log(`🚀 Servidor da EntregasJá rodando na porta ${PORT}`));
+function shutdown(signal) {
+  console.log(`\n${signal} recebido. Encerrando...`);
+  server.close(() => process.exit(0));
+}
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

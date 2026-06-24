@@ -1,0 +1,14 @@
+node_modules/
+npm-debug.log*
+.env
+.env.local
+
+# Artefatos de execucao da Fase 4 (k6 / relatorios)
+load/results/
+*.log
+coverage/
+.DS_Store
+
+# Binarios baixados localmente (Toxiproxy / k6) caso fiquem na pasta do projeto
+bin/
+*.exe
